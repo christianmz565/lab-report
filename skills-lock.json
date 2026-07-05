@@ -16,6 +16,12 @@
       "source": "affaan-m/everything-claude-code",
       "sourceType": "autoskills-registry",
       "computedHash": "4c1e0c6805760534d8fd1a9fa2e4b5eb700b402f054254383437bd679d341cbd"
+    },
+    "jujutsu": {
+      "source": "cryfs/cryfs",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/jujutsu/SKILL.md",
+      "computedHash": "1a8d043afcc84893c6eb168d03f90942b56b1f90cbeb83c1543a1e194d777eba"
     }
   }
 }
