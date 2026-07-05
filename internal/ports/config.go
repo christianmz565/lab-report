@@ -2,11 +2,12 @@ package ports
 
 // CaptureConfig defines terminal capture parameters such as dimensions, freeze regions, and color scheme.
 type CaptureConfig struct {
-	Columns     int               `json:"columns"`
-	Rows        int               `json:"rows,omitempty"`
-	FreezeFlags []string          `json:"freezeFlags"`
-	Prompt      string            `json:"prompt"`
-	Colors      map[string]string `json:"colors"`
+	Columns        int               `json:"columns"`
+	Rows           int               `json:"rows,omitempty"`
+	FreezeFlags    []string          `json:"freezeFlags"`
+	Prompt         string            `json:"prompt"`
+	Colors         map[string]string `json:"colors"`
+	CommandTimeout int               `json:"commandTimeout,omitempty"`
 }
 
 // PrepareInputConfig specifies the source directory and report file used as input for report preparation.

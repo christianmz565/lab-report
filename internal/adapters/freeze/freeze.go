@@ -276,12 +276,25 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	shellPGID, err := getForegroundPGID(ptmx.Fd())
+	if err != nil {
+		return "", fmt.Errorf("get shell pgid: %w", err)
+	}
+
 	for _, cmd := range commands {
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
 		switch cmd.Type {
 		case "Command":
+			if err := typeColored(ptmx, vtWrite, cmd.Args, cfg); err != nil {
+				return "", fmt.Errorf("type colored command: %w", err)
+			}
+			if _, err := io.WriteString(ptmx, "\r"); err != nil {
+				return "", fmt.Errorf("write carriage return: %w", err)
+			}
+			waitForCommand(ptmx.Fd(), shellPGID, cfg)
+		case "CommandStart":
 			if err := typeColored(ptmx, vtWrite, cmd.Args, cfg); err != nil {
 				return "", fmt.Errorf("type colored command: %w", err)
 			}
@@ -298,7 +311,7 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 			if _, err := io.WriteString(ptmx, "\r"); err != nil {
 				return "", fmt.Errorf("write carriage return: %w", err)
 			}
-			time.Sleep(500 * time.Millisecond)
+			waitForCommand(ptmx.Fd(), shellPGID, cfg)
 		case "Raw":
 			if _, err := io.WriteString(ptmx, cmd.Args); err != nil {
 				return "", fmt.Errorf("write raw: %w", err)
@@ -314,7 +327,7 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 					}
 				}
 			}
-			time.Sleep(500 * time.Millisecond)
+			waitForCommand(ptmx.Fd(), shellPGID, cfg)
 		case "Key":
 			switch strings.ToLower(cmd.Args) {
 			case "enter":
@@ -340,14 +353,17 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 		}
 	}
 
-	time.Sleep(1 * time.Second)
 	frame := emu.GetScreen()
+	_ = vtRead.Close()
+	_ = vtWrite.Close()
 	if err := ptmx.Close(); err != nil {
 		slog.Warn("failed to close ptmx", "error", err)
 	}
 
-	// Wait for the copy goroutine to finish
-	<-copyDone
+	select {
+	case <-copyDone:
+	case <-time.After(1 * time.Second):
+	}
 
 	done := make(chan struct{})
 	go func() {
@@ -357,7 +373,7 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 
 	select {
 	case <-done:
-	case <-time.After(2 * time.Second):
+	case <-time.After(1 * time.Second):
 	}
 
 	startRow := 0
