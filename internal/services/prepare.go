@@ -137,9 +137,6 @@ func (s *PrepareService) Execute(ctx context.Context, opt PrepareOptions, labDir
 	}
 	inputs := map[string]string{"title": generatedReportName}
 	inputs["unsarep-root"] = "/"
-	if pctx.isMulti {
-		inputs["unsarep-root"] = "/" + pctx.labDir + "/"
-	}
 	if err := s.Compiler.Compile(ctx, reportPath, reportPDF, inputs); err != nil {
 		return fmt.Errorf("compile report: %w", err)
 	}
