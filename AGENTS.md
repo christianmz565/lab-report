@@ -27,30 +27,30 @@ go test -run TestSpecificName ./internal/cmd/...
 
 **Ports and Adapters pattern** with dependency injection:
 
-- `internal/ports/` - Interfaces (Archiver, Compiler, Fetcher, etc.)
-- `internal/adapters/` - Concrete implementations (osfs, github, config, typst, zipper)
-- `internal/services/` - Business logic (install, update, prepare, capture, component)
-- `internal/cmd/` - CLI commands (cobra)
-- `internal/mocks/` - testify mocks for all port interfaces
+* `internal/ports/` - Interfaces (Archiver, Compiler, Fetcher, etc.)
+* `internal/adapters/` - Concrete implementations (osfs, github, config, typst, zipper)
+* `internal/services/` - Business logic (install, update, prepare, capture, component)
+* `internal/cmd/` - CLI commands (cobra)
+* `internal/mocks/` - testify mocks for all port interfaces
 
 Entry point: `cmd/unsarep/main.go` → `internal/cmd.Execute()`
 
 ## Key Facts
 
-- **Version control**: Uses Jujutsu (jj), not git directly
-- **Version injection**: Set via ldflags: `-X github.com/UNSAReport/UNSAReport/internal/cmd.Version={{.Version}}`
-- **External tools**: Typst, Freeze (charmbracelet), ImageMagick - validated at runtime, not build time
-- **Goroutine leak detection**: All test packages use `goleak.VerifyTestMain`
-- **Integration tests**: Require `//go:build integration` tag and external tools on PATH
-- **Config**: Uses viper with `UNSAREP_` env prefix
-- **Nix dev shell**: Run `nix develop` or `direnv allow` for pre-configured environment
+* **Version control**: Uses Jujutsu (jj), not git directly
+* **Version injection**: Set via ldflags: `-X github.com/UNSAReport/UNSAReport/internal/cmd.Version={{.Version}}`
+* **External tools**: Typst, Freeze (charmbracelet), ImageMagick - validated at runtime, not build time
+* **Goroutine leak detection**: All test packages use `goleak.VerifyTestMain`
+* **Integration tests**: Require `//go:build integration` tag and external tools on PATH
+* **Config**: Uses viper with `UNSAREP_` env prefix
+* **Nix dev shell**: Run `nix develop` or `direnv allow` for pre-configured environment
 
 ## Testing Patterns
 
-- Unit tests: `testify` (assert/require) + `mock` for port interfaces
-- Integration tests: `internal/services/e2e_test.go` with mock fetchers/registries
-- Test parallelism: Use `t.Parallel()` for independent tests
-- Test cleanup: Use `t.TempDir()` for filesystem tests
+* Unit tests: `testify` (assert/require) + `mock` for port interfaces
+* Integration tests: `internal/services/e2e_test.go` with mock fetchers/registries
+* Test parallelism: Use `t.Parallel()` for independent tests
+* Test cleanup: Use `t.TempDir()` for filesystem tests
 
 ## Build & Release
 
@@ -59,11 +59,24 @@ Entry point: `cmd/unsarep/main.go` → `internal/cmd.Execute()`
 go build ./cmd/unsarep
 
 # Release build with version
-go build -ldflags "-X github.com/UNSAReport/UNSAReport/internal/cmd.Version=1.0.0" ./cmd/unsarep
+go build -ldflags "-X [github.com/UNSAReport/UNSAReport/internal/cmd.Version=1.0.0](https://github.com/UNSAReport/UNSAReport/internal/cmd.Version=1.0.0)" ./cmd/unsarep
 
 # Nix build
 nix build
+
 ```
+
+### Updating the Nix Vendor Hash
+
+When Go dependencies change, the Nix build will fail due to a mismatched `vendorHash`. To fix this:
+
+1. Open `flake.nix` (or your Nix build file) and set `vendorHash = "";` (or `lib.fakeHash`).
+2. Run the build with log output enabled:
+```bash
+nix build -L
+```
+3. The build will fail and print an error message showing the `got:` hash (e.g., `sha256-............................`).
+4. Copy that expected hash value and paste it back into your Nix file as the new `vendorHash`.
 
 ## File Structure
 
@@ -83,12 +96,13 @@ internal/
   mocks/                      # Test mocks
   dependencies/               # External tool checks
 schemas/                      # JSON schemas for config
+
 ```
 
 ## Conventions
 
-- Error handling: Use `samber/oops` for stack traces in debug mode
-- CLI framework: cobra commands with viper config binding
-- Logging: `log/slog` with text handler to stderr
-- Formatting: `gofmt` + `goimports` (enforced by golangci-lint)
-- Linters: revive (exported/package-comments disabled), misspell
+* Error handling: Use `samber/oops` for stack traces in debug mode
+* CLI framework: cobra commands with viper config binding
+* Logging: `log/slog` with text handler to stderr
+* Formatting: `gofmt` + `goimports` (enforced by golangci-lint)
+* Linters: revive (exported/package-comments disabled), misspell

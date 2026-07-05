@@ -33,11 +33,11 @@
       {
         packages.default = pkgs.buildGoModule rec {
           pname = "unsarep";
-          version = "1.0.0";
+          version = "1.0.1";
           src = ./.;
           subPackages = [ "cmd/unsarep" ];
 
-          vendorHash = "sha256-/ctnLbz8NGaHYhRgrLXe6ZSTgxbiSpNikOcZPqRvHSk=";
+          vendorHash = "sha256-O7XiqeKIKCuv8zugr7JGwE5yR//ghgkFf8tkjIXZENM=";
 
           nativeBuildInputs = [
             pkgs.pkg-config
