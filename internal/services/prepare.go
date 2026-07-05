@@ -218,6 +218,10 @@ func (s *PrepareService) listGitFiles(ctx context.Context, srcDir string) ([]str
 		if err != nil {
 			continue
 		}
+		info, err := os.Stat(line)
+		if err != nil || info.IsDir() {
+			continue
+		}
 		files = append(files, rel)
 	}
 
