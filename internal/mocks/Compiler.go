@@ -70,6 +70,55 @@ func (_c *Compiler_Compile_Call) RunAndReturn(run func(context.Context, string, 
 	return _c
 }
 
+// Watch provides a mock function with given fields: ctx, reportPath, reportPDF, inputs
+func (_m *Compiler) Watch(ctx context.Context, reportPath string, reportPDF string, inputs map[string]string) error {
+	ret := _m.Called(ctx, reportPath, reportPDF, inputs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Watch")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, map[string]string) error); ok {
+		r0 = rf(ctx, reportPath, reportPDF, inputs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Compiler_Watch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Watch'
+type Compiler_Watch_Call struct {
+	*mock.Call
+}
+
+// Watch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - reportPath string
+//   - reportPDF string
+//   - inputs map[string]string
+func (_e *Compiler_Expecter) Watch(ctx interface{}, reportPath interface{}, reportPDF interface{}, inputs interface{}) *Compiler_Watch_Call {
+	return &Compiler_Watch_Call{Call: _e.mock.On("Watch", ctx, reportPath, reportPDF, inputs)}
+}
+
+func (_c *Compiler_Watch_Call) Run(run func(ctx context.Context, reportPath string, reportPDF string, inputs map[string]string)) *Compiler_Watch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(map[string]string))
+	})
+	return _c
+}
+
+func (_c *Compiler_Watch_Call) Return(_a0 error) *Compiler_Watch_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Compiler_Watch_Call) RunAndReturn(run func(context.Context, string, string, map[string]string) error) *Compiler_Watch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // QueryVars provides a mock function with given fields: ctx, reportPath
 func (_m *Compiler) QueryVars(ctx context.Context, reportPath string) (map[string]string, error) {
 	ret := _m.Called(ctx, reportPath)

@@ -31,17 +31,18 @@ Instructions are processed sequentially:
 - "r:<text>": Writes text directly without Enter.
 - "c:<key>": Sends Ctrl + key combination (e.g., "c:c" for Ctrl+C).
 - "k:<key>": Sends a control key (e.g., "k:enter", "k:tab", "k:backspace", "k:esc").
+- "x:<text>": Types text and presses Enter but does not wait for the command to finish (for interactive programs like node, python).
 
 A raw log of the session (including ANSI colors) is automatically saved in
 the capture_logs/ directory as a .log file.`,
 		Example: `  # Simple capture
   unsarep capture output.png "ls -la" "cat README.md"
 
-  # Using control characters and raw input
-  unsarep capture output.png "python" "print('hello')" "k:enter" "c:d"
+  # Interactive program (node REPL)
+  unsarep capture output.png "x:node" "r:console.log('hello')" "k:enter" "c:d"
 
   # With custom directory and delays
-  unsarep capture --cwd ./src result.png "python" "print('hello')" "w:1s"`,
+  unsarep capture --cwd ./src result.png "x:python3" "r:print('hello')" "k:enter" "c:d"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
 				return cmd.Help()

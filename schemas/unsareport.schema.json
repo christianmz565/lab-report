@@ -72,6 +72,11 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "commandTimeout": {
+          "type": "integer",
+          "default": 30,
+          "description": "Maximum seconds to wait for a command to finish"
         }
       }
     },

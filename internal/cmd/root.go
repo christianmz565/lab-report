@@ -33,6 +33,7 @@ func setupCLI() {
 		newInstallCmd(),
 		newUpdateCmd(),
 		newPrepareCmd(),
+		newWatchCmd(),
 		newCaptureCmd(),
 		newComponentCmd(),
 		newCompletionCmd(),

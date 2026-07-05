@@ -16,8 +16,8 @@ import (
 	"github.com/UNSAReport/UNSAReport/internal/dependencies"
 	"github.com/UNSAReport/UNSAReport/internal/ports"
 	"github.com/aymanbagabas/go-pty"
+	xterm "github.com/gitpod-io/xterm-go"
 	"github.com/samber/oops"
-	"github.com/taigrr/bubbleterm/emulator"
 )
 
 var _ ports.Renderer = (*Adapter)(nil)
@@ -142,7 +142,7 @@ func getAnsi(colors map[string]string, name string) string {
 	return "\x1b[" + code + "m"
 }
 
-func typeColored(ptmx io.Writer, vtWrite io.Writer, cmdStr string, cfg ports.CaptureConfig) error {
+func typeColored(ptmx io.Writer, term io.Writer, cmdStr string, cfg ports.CaptureConfig) error {
 	cCol := getAnsi(cfg.Colors, "command")
 	aCol := getAnsi(cfg.Colors, "args")
 	rCol := getAnsi(cfg.Colors, "reset")
@@ -154,7 +154,7 @@ func typeColored(ptmx io.Writer, vtWrite io.Writer, cmdStr string, cfg ports.Cap
 		rest = " " + parts[1]
 	}
 
-	if _, err := vtWrite.Write([]byte(cCol)); err != nil {
+	if _, err := term.Write([]byte(cCol)); err != nil {
 		return fmt.Errorf("write command color: %w", err)
 	}
 	if _, err := ptmx.Write([]byte(firstWord)); err != nil {
@@ -162,7 +162,7 @@ func typeColored(ptmx io.Writer, vtWrite io.Writer, cmdStr string, cfg ports.Cap
 	}
 	if rest != "" {
 		time.Sleep(20 * time.Millisecond)
-		if _, err := vtWrite.Write([]byte(aCol)); err != nil {
+		if _, err := term.Write([]byte(aCol)); err != nil {
 			return fmt.Errorf("write args color: %w", err)
 		}
 		if _, err := ptmx.Write([]byte(rest)); err != nil {
@@ -170,7 +170,7 @@ func typeColored(ptmx io.Writer, vtWrite io.Writer, cmdStr string, cfg ports.Cap
 		}
 	}
 	time.Sleep(20 * time.Millisecond)
-	if _, err := vtWrite.Write([]byte(rCol)); err != nil {
+	if _, err := term.Write([]byte(rCol)); err != nil {
 		return fmt.Errorf("write reset color: %w", err)
 	}
 	return nil
@@ -210,20 +210,16 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 		return "", err
 	}
 
-	vtRead, vtWrite := io.Pipe()
-	emu, err := emulator.NewFromPipes(width, height, vtRead, ptmx)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		if err := emu.Close(); err != nil {
-			slog.Warn("failed to close emulator", "error", err)
-		}
-	}()
+	term := xterm.New(
+		xterm.WithCols(width),
+		xterm.WithRows(height),
+		xterm.WithScrollback(0),
+	)
+	defer term.Dispose()
 
 	copyDone := make(chan error, 1)
 	go func() {
-		_, copyErr := io.Copy(vtWrite, ptmx)
+		_, copyErr := io.Copy(term, ptmx)
 		copyDone <- copyErr
 	}()
 
@@ -258,22 +254,19 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 		return "", fmt.Errorf("write echo start: %w", err)
 	}
 
-	anchorFound := false
 	for range 20 {
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
-		frame := emu.GetScreen()
-		for _, row := range frame.Rows {
-			if strings.Contains(row, "---START---") {
-				anchorFound = true
-				break
-			}
-		}
-		if anchorFound {
+		if strings.Contains(term.String(), "---START---") {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
+	}
+
+	shellPGID, err := getForegroundPGID(ptmx.Fd())
+	if err != nil {
+		return "", fmt.Errorf("get shell pgid: %w", err)
 	}
 
 	for _, cmd := range commands {
@@ -282,7 +275,15 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 		}
 		switch cmd.Type {
 		case "Command":
-			if err := typeColored(ptmx, vtWrite, cmd.Args, cfg); err != nil {
+			if err := typeColored(ptmx, term, cmd.Args, cfg); err != nil {
+				return "", fmt.Errorf("type colored command: %w", err)
+			}
+			if _, err := io.WriteString(ptmx, "\r"); err != nil {
+				return "", fmt.Errorf("write carriage return: %w", err)
+			}
+			waitForCommand(ptmx.Fd(), shellPGID, cfg)
+		case "CommandStart":
+			if err := typeColored(ptmx, term, cmd.Args, cfg); err != nil {
 				return "", fmt.Errorf("type colored command: %w", err)
 			}
 			if _, err := io.WriteString(ptmx, "\r"); err != nil {
@@ -290,7 +291,7 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 			}
 			time.Sleep(500 * time.Millisecond)
 		case "Type":
-			if err := typeColored(ptmx, vtWrite, cmd.Args, cfg); err != nil {
+			if err := typeColored(ptmx, term, cmd.Args, cfg); err != nil {
 				return "", fmt.Errorf("type colored: %w", err)
 			}
 			time.Sleep(100 * time.Millisecond)
@@ -298,7 +299,7 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 			if _, err := io.WriteString(ptmx, "\r"); err != nil {
 				return "", fmt.Errorf("write carriage return: %w", err)
 			}
-			time.Sleep(500 * time.Millisecond)
+			waitForCommand(ptmx.Fd(), shellPGID, cfg)
 		case "Raw":
 			if _, err := io.WriteString(ptmx, cmd.Args); err != nil {
 				return "", fmt.Errorf("write raw: %w", err)
@@ -314,7 +315,7 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 					}
 				}
 			}
-			time.Sleep(500 * time.Millisecond)
+			waitForCommand(ptmx.Fd(), shellPGID, cfg)
 		case "Key":
 			switch strings.ToLower(cmd.Args) {
 			case "enter":
@@ -340,14 +341,16 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 		}
 	}
 
-	time.Sleep(1 * time.Second)
-	frame := emu.GetScreen()
+	sa := xterm.NewSerializeAddon(term)
+	rawOutput := sa.Serialize(nil)
 	if err := ptmx.Close(); err != nil {
 		slog.Warn("failed to close ptmx", "error", err)
 	}
 
-	// Wait for the copy goroutine to finish
-	<-copyDone
+	select {
+	case <-copyDone:
+	case <-time.After(1 * time.Second):
+	}
 
 	done := make(chan struct{})
 	go func() {
@@ -357,28 +360,23 @@ func runInPTY(ctx context.Context, commands []ports.CaptureCommand, cfg ports.Ca
 
 	select {
 	case <-done:
-	case <-time.After(2 * time.Second):
+	case <-time.After(1 * time.Second):
 	}
 
-	startRow := 0
-	for i, row := range frame.Rows {
-		if strings.Contains(row, "---START---") {
-			startRow = i + 1
-		}
-	}
-
-	lastIdx := -1
-	for i := len(frame.Rows) - 1; i >= startRow; i-- {
-		clean := strings.ReplaceAll(frame.Rows[i], "\033[0m", "")
-		if strings.TrimSpace(clean) != "" {
-			lastIdx = i
-			break
-		}
-	}
-
-	if lastIdx == -1 || lastIdx < startRow {
+	output := string(rawOutput)
+	firstIdx := strings.Index(output, "---START---")
+	if firstIdx == -1 {
 		return "", nil
 	}
-
-	return strings.Join(frame.Rows[startRow:lastIdx+1], "\n") + "\n", nil
+	secondIdx := strings.Index(output[firstIdx+len("---START---"):], "---START---")
+	if secondIdx == -1 {
+		return "", nil
+	}
+	idx := firstIdx + len("---START---") + secondIdx
+	output = output[idx+len("---START---"):]
+	output = strings.TrimLeft(output, "\r\n")
+	if output == "" {
+		return "", nil
+	}
+	return output, nil
 }

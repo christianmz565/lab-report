@@ -95,3 +95,24 @@ func (a *Adapter) Compile(ctx context.Context, reportPath, reportPDF string, inp
 	}
 	return nil
 }
+
+// Watch runs typst watch to recompile reportPDF on file changes, passing inputs as --input flags.
+func (a *Adapter) Watch(ctx context.Context, reportPath, reportPDF string, inputs map[string]string) error {
+	if err := dependencies.Check(dependencies.Typst); err != nil {
+		return err
+	}
+
+	args := []string{"watch", "--root", "."}
+	for k, v := range inputs {
+		args = append(args, "--input", k+"="+v)
+	}
+	args = append(args, reportPath, reportPDF)
+
+	cmd := exec.CommandContext(ctx, "typst", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("typst watch failed: %w", err)
+	}
+	return nil
+}

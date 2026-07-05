@@ -137,9 +137,6 @@ func (s *PrepareService) Execute(ctx context.Context, opt PrepareOptions, labDir
 	}
 	inputs := map[string]string{"title": generatedReportName}
 	inputs["unsarep-root"] = "/"
-	if pctx.isMulti {
-		inputs["unsarep-root"] = "/" + pctx.labDir + "/"
-	}
 	if err := s.Compiler.Compile(ctx, reportPath, reportPDF, inputs); err != nil {
 		return fmt.Errorf("compile report: %w", err)
 	}
@@ -219,6 +216,10 @@ func (s *PrepareService) listGitFiles(ctx context.Context, srcDir string) ([]str
 		}
 		rel, err := filepath.Rel(srcDir, line)
 		if err != nil {
+			continue
+		}
+		info, err := os.Stat(line)
+		if err != nil || info.IsDir() {
 			continue
 		}
 		files = append(files, rel)
